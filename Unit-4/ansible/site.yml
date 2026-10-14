@@ -1,0 +1,109 @@
+
+---
+- name: Deploy Student Academic Platform
+  hosts: student_servers
+  become: true
+
+  vars:
+    app_dir: /opt/student-academic-platform
+    image_name: student-academic-platform
+    container_name: student-academic-platform
+    host_port: 8080
+    container_port: 5000
+
+  tasks:
+    - name: Update apt package cache
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Install Docker and curl
+      ansible.builtin.apt:
+        name:
+          - docker.io
+          - curl
+        state: present
+
+    - name: Start and enable Docker
+      ansible.builtin.service:
+        name: docker
+        state: started
+        enabled: true
+
+    - name: Create application directory
+      ansible.builtin.file:
+        path: "{{ app_dir }}"
+        state: directory
+        mode: "0755"
+
+    - name: Copy application source
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../app/"
+        dest: "{{ app_dir }}/app/"
+        mode: preserve
+
+    - name: Copy Dockerfile
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../Dockerfile"
+        dest: "{{ app_dir }}/Dockerfile"
+        mode: "0644"
+
+    - name: Copy requirements
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../requirements.txt"
+        dest: "{{ app_dir }}/requirements.txt"
+        mode: "0644"
+
+    - name: Copy application entry point
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../run.py"
+        dest: "{{ app_dir }}/run.py"
+        mode: "0644"
+
+    - name: Create persistent database directory
+      ansible.builtin.file:
+        path: "{{ app_dir }}/database"
+        state: directory
+        mode: "0755"
+
+    - name: Build application Docker image
+      ansible.builtin.command:
+        argv:
+          - docker
+          - build
+          - -t
+          - "{{ image_name }}"
+          - "{{ app_dir }}"
+
+    - name: Remove previous application container if present
+      ansible.builtin.command:
+        argv:
+          - docker
+          - rm
+          - -f
+          - "{{ container_name }}"
+      failed_when: false
+      changed_when: false
+
+    - name: Run application container
+      ansible.builtin.command:
+        argv:
+          - docker
+          - run
+          - -d
+          - --restart
+          - unless-stopped
+          - --name
+          - "{{ container_name }}"
+          - -p
+          - "{{ host_port }}:{{ container_port }}"
+          - -v
+          - "{{ app_dir }}/database:/app/database"
+          - "{{ image_name }}"
+
+    - name: Wait for Flask application to start
+      ansible.builtin.wait_for:
+        host: 127.0.0.1
+        port: "{{ host_port }}"
+        delay: 3
+        timeout: 60

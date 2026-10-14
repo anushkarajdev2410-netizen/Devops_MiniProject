@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+reports/
+
+# Secrets and private keys
+*.pem
+*.key
+.aws/
+terraform.tfstate
+terraform.tfstate.*
+.terraform/
+*.tfplan
+
+# Editor and operating system files
+.vscode/
+.DS_Store
+Thumbs.db
